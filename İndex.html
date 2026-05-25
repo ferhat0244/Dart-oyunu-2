@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro Dart King: Voice Commentator Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: #0d0606;
+            color: #ffffff;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 500px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chaos-mode {
+            animation: redAlert 2s infinite ease-in-out;
+        }
+
+        @keyframes redAlert {
+            0% { box-shadow: inset 0 0 15px rgba(255, 0, 85, 0); }
+            50% { box-shadow: inset 0 0 40px rgba(255, 0, 85, 0.45); }
+            100% { box-shadow: inset 0 0 15px rgba(255, 0, 85, 0); }
+        }
+
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 15px;
+            z-index: 10;
+        }
+
+        .ui-box {
+            background: rgba(15, 10, 10, 0.9);
+            padding: 10px 15px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            border: 2px solid #ffcc00;
+            text-shadow: 0 0 8px #ffcc00;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            transition: all 0.3s ease;
+        }
+
+        #wind-box { border-color: #ff3366; text-shadow: 0 0 8px #ff3366; }
+        #lives-box { border-color: #ff0055; text-shadow: 0 0 8px #ff0055; color: #ff3366; }
+
+        .chaos-ui {
+            border-color: #ff0055 !important;
+            text-shadow: 0 0 15px #ff0055 !important;
+            box-shadow: 0 0 20px rgba(255, 0, 85, 0.4) !important;
+        }
+
+        #combo-text {
+            position: absolute;
+            top: 42%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-size: 32px;
+            font-weight: 900;
+            color: #fff;
+            text-align: center;
+            text-transform: uppercase;
+            z-index: 15;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+            line-height: 1.2;
+        }
+
+        #game-over-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 5, 5, 0.95);
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            display: none;
+        }
+
+        #game-over-panel {
+            background: linear-gradient(135deg, #1f1111 0%, #0d0606 100%);
+            border: 3px solid #ff0055;
+            padding: 30px;
+            border-radius: 24px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(255, 0, 85, 0.3);
+            max-width: 85%;
+            width: 320px;
+        }
+
+        #game-over-panel h1 {
+            font-size: 32px;
+            color: #ff0055;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px #ff0055;
+        }
+
+        #game-over-panel p {
+            font-size: 20px;
+            margin-bottom: 25px;
+            color: #fff;
+        }
+
+        #restart-btn {
+            background: #ffcc00;
+            color: #000;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 204, 0, 0.4);
+            transition: transform 0.1s;
+        }
+
+        #restart-btn:active { transform: scale(0.95); }
+
+        canvas { width: 100%; height: 100%; display: block; }
+
+        #instruction {
+            position: absolute;
+            bottom: 25px;
+            width: 100%;
+            text-align: center;
+            color: #ccc;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px #000;
+            animation: pulse 1.5s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="ui-panel">
+            <div class="ui-box" id="score-box">Skor: <span id="score">0</span></div>
+            <div class="ui-box" id="wind-box">Rüzgar: <span id="wind">0.0</span></div>
+            <div class="ui-box" id="lives-box"><span id="lives">❤️❤️❤️</span></div>
+        </div>
+        
+        <div id="combo-text">BULLSEYE!</div>
+        
+        <div id="game-over-screen">
+            <div id="game-over-panel">
+                <h1>OYUN BİTTİ</h1>
+                <p>Toplam Skorun: <span id="final-score" style="color: #ffcc00; font-weight: bold;">0</span></p>
+                <button id="restart-btn" onclick="restartGame()">YENİDEN BAŞLA</button>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+        <div id="instruction">Spikerli Mod Aktif! İlk atışta ses yüklenir.</div>
+    </div>
+
+    <script {sandbox="allow-scripts"}>
+        let canvas, ctx, scoreDisplay, windDisplay, comboText, livesDisplay, gameOverScreen, finalScoreDisplay, gameContainer;
+        
+        let boardCenter = { x: 0, y: 0 };
+        let baseBoardCenterY = 0; 
+        let baseBoardRadius = 0;
+        let boardRadius = 0;
+        
+        let boardDirectionX = 1; 
+        let boardDirectionY = 1; 
+        let boardSpeedX = 1.0; 
+        let boardSpeedY = 0.6;   
+
+        let totalScore = 0;
+        let playerLives = 3;
+        let isGameOver = false;
+
+        const dartSectors = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+        let currentWind = 0;
+
+        let dart = {
+            x: 0, y: 0, startX: 0, startY: 0,
+            vx: 0, vy: 0, isFlying: false, scale: 1,
+            isPinned: false,  
+            offsetX: 0,
+            offsetY: 0        
+        };
+
+        let touchStart = { x: 0, y: 0 };
+        let currentTouch = { x: 0, y: 0, isHolding: false };
+
+        // --- SES MOTORU ---
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            // Tarayıcının konuşma motorunu tetiklemek için sessiz bir tetikleyici atalım
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.getVoices();
+            }
+        }
+
+        // AYARLANDI: Şevkli ve heyecanlı Türkçe sesli anons sistemi
+        function speakScore(points) {
+            if (!('speechSynthesis' in window)) return;
+
+            // Devam eden diğer konuşmalar varsa hemen kes ki anında söylesin
+            window.speechSynthesis.cancel();
+
+            let textToSay = "";
+
+            if (points === 0) {
+                textToSay = "Iska! Dikkat et!";
+            } else if (points === 50) {
+                textToSay = "Muazzam! Tam isabet elli puan!";
+            } else if (points === 25) {
+                textToSay = "Harika! Yirmi beş puan!";
+            } else if (points >= 30) {
+                textToSay = `Müthiş! ${points} puan!`;
+            } else if (points >= 15) {
+                textToSay = `Harika! ${points} puan!`;
+            } else {
+                textToSay = `Güzel! ${points} puan!`;
+            }
+
+            let utterance = new SpeechSynthesisUtterance(textToSay);
+            utterance.lang = 'tr-TR';
+            
+            // Şevk ve heyecan katmak için hız ve tını ayarları tırmandırıldı
+            utterance.rate = 1.25; // %25 daha hızlı ve coşkulu konuşma ritmi
+            utterance.pitch = 1.15; // Bir tık daha enerjik, tiz kafa sesi tınısı
+            utterance.volume = 1.0;
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            let now = audioCtx.currentTime;
+
+            if (type === 'woosh') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.exponentialRampToValueAtTime(520, now + 0.09);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.09);
+                osc.start(now); osc.stop(now + 0.09);
+            } 
+            else if (type === 'hit') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.setValueAtTime(90, now + 0.04);
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now); osc.stop(now + 0.15);
+            } 
+            else if (type === 'miss') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(95, now);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            }
+            else if (type === 'gameover') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(280, now);
+                osc.frequency.linearRampToValueAtTime(140, now + 0.5);
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now); osc.stop(now + 0.5);
+                
+                // Oyun bittiğinde spiker de konuşsun
+                setTimeout(() => {
+                    let ut = new SpeechSynthesisUtterance(`Oyun bitti! Toplam skorun ${totalScore}`);
+                    ut.lang = 'tr-TR'; ut.rate = 1.1; window.speechSynthesis.speak(ut);
+                }, 500);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            scoreDisplay = document.getElementById('score');
+            windDisplay = document.getElementById('wind');
+            comboText = document.getElementById('combo-text');
+            livesDisplay = document.getElementById('lives');
+            gameOverScreen = document.getElementById('game-over-screen');
+            finalScoreDisplay = document.getElementById('final-score');
+            gameContainer = document.getElementById('game-container');
+
+            resizeCanvas();
+            initGame();
+            
+            canvas.addEventListener('touchstart', handleTouchStart, {passive: false});
+            canvas.addEventListener('touchmove', handleTouchMove, {passive: false});
+            canvas.addEventListener('touchend', handleTouchEnd, {passive: false});
+            
+            update();
+        });
+
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            boardCenter.x = canvas.width / 2;
+            baseBoardCenterY = canvas.height * 0.38;
+            boardCenter.y = baseBoardCenterY;
+            baseBoardRadius = Math.min(canvas.width, canvas.height) * 0.35;
+            boardRadius = baseBoardRadius;
+        }
+
+        function initGame() {
+            totalScore = 0;
+            playerLives = 3;
+            isGameOver = false;
+            scoreDisplay.innerText = totalScore;
+            updateLivesUI();
+            gameOverScreen.style.display = "none";
+            gameContainer.classList.remove('chaos-mode');
+            document.querySelectorAll('.ui-box').forEach(el => el.classList.remove('chaos-ui'));
+            generateNewWind();
+            resetDartPosition();
+            resizeCanvas();
+        }
+
+        function updateLivesUI() {
+            let hearts = "";
+            for(let i=0; i<playerLives; i++) { hearts += "❤️"; }
+            livesDisplay.innerText = hearts === "" ? "ELENDİN" : hearts;
+        }
+
+        function generateNewWind() {
+            if (isGameOver) return;
+            
+            let maxWindMultiplier = 1.8 + (totalScore * 0.018);
+            if (totalScore >= 200) maxWindMultiplier = 7.0; 
+            if (maxWindMultiplier > 7.0) maxWindMultiplier = 7.0;
+
+            currentWind = (Math.random() * (maxWindMultiplier * 2) - maxWindMultiplier); 
+            updateWindUI();
+        }
+
+        function updateWindUI() {
+            windDisplay.innerText = `${Math.abs(currentWind).toFixed(1)} ${currentWind > 0 ? 'Sağ' : 'Sol'}`;
+        }
+
+        function resetDartPosition() {
+            if (isGameOver) return;
+            dart.startX = canvas.width / 2;
+            dart.startY = canvas.height * 0.82;
+            dart.x = dart.startX;
+            dart.y = dart.startY;
+            dart.vx = 0;
+            dart.vy = 0;
+            dart.scale = 1;
+            dart.isFlying = false;
+            dart.isPinned = false; 
+            dart.offsetX = 0;
+            dart.offsetY = 0;
+            currentTouch.isHolding = false;
+        }
+
+        function showCombo(text, color) {
+            comboText.innerHTML = text;
+            comboText.style.textShadow = `0 0 20px ${color}, 0 4px 10px rgba(0,0,0,0.8)`;
+            comboText.style.color = color;
+            comboText.style.transform = 'translate(-50%, -50%) scale(1)';
+            setTimeout(() => {
+                comboText.style.transform = 'translate(-50%, -50%) scale(0)';
+            }, 1400);
+        }
+
+        function triggerGameOver() {
+            isGameOver = true;
+            finalScoreDisplay.innerText = totalScore;
+            gameOverScreen.style.display = "flex";
+            playSound('gameover');
+        }
+
+        function restartGame() { initGame(); }
+
+        function handleTouchStart(e) {
+            initAudio();
+            if (dart.isFlying || dart.isPinned || isGameOver) return;
+            e.preventDefault();
+            
+            const t = e.touches[0];
+            touchStart.x = t.clientX;
+            touchStart.y = t.clientY;
+            
+            currentTouch.x = t.clientX;
+            currentTouch.y = t.clientY;
+            currentTouch.isHolding = true;
+        }
+
+        function handleTouchMove(e) {
+            if (!currentTouch.isHolding || dart.isFlying || dart.isPinned || isGameOver) return;
+            e.preventDefault();
+            
+            const t = e.touches[0];
+            currentTouch.x = t.clientX;
+            currentTouch.y = t.clientY;
+            
+            dart.x = currentTouch.x;
+            dart.y = currentTouch.y;
+            
+            let maxDragY = canvas.height * 0.65;
+            if(dart.y < maxDragY) dart.y = maxDragY;
+            if(dart.y > canvas.height * 0.9) dart.y = canvas.height * 0.9;
+        }
+
+        function handleTouchEnd(e) {
+            if (!currentTouch.isHolding || dart.isFlying || dart.isPinned || isGameOver) return;
+            currentTouch.isHolding = false;
+            
+            let distX = currentTouch.x - touchStart.x;
+            let distY = currentTouch.y - touchStart.y;
+            
+            if (distY < -45) { 
+                dart.isFlying = true;
+                dart.vx = distX * 0.065; 
+                dart.vy = -14.5 + (distY * 0.015); 
+                playSound('woosh');
+            } else {
+                resetDartPosition();
+            }
+        }
+
+        function drawBrickWall() {
+            let brickWidth = 60;
+            let brickHeight = 25;
+            let gutter = 3;
+
+            ctx.fillStyle = "#4a231c"; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#26120e"; 
+            
+            for (let y = 0; y < canvas.height; y += brickHeight + gutter) {
+                let offset = (Math.floor(y / (brickHeight + gutter)) % 2) * (brickWidth / 2);
+                ctx.fillRect(0, y, gutter, brickHeight + gutter);
+                for (let x = -brickWidth; x < canvas.width + brickWidth; x += brickWidth + gutter) {
+                    ctx.fillRect(x + offset, y, gutter, brickHeight + gutter);
+                }
+            }
+            
+            let wallLight = ctx.createRadialGradient(boardCenter.x, boardCenter.y, boardRadius, boardCenter.x, boardCenter.y, canvas.height * 0.6);
+            wallLight.addColorStop(0, 'rgba(0,0,0,0.1)');
+            wallLight.addColorStop(1, 'rgba(0,0,0,0.75)');
+            ctx.fillStyle = wallLight;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function calculateScore(hitX, hitY) {
+            let dx = hitX - boardCenter.x;
+            let dy = hitY - boardCenter.y;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance > boardRadius) {
+                playerLives--;
+                updateLivesUI();
+                showCombo("ISKA!<br><span style='font-size:20px; color:#ff3366;'>DUVARA ÇARPTI (-1 CAN)</span>", "#ff3366");
+                playSound('miss');
+                speakScore(0); // Spiker anonsu
+                if (playerLives <= 0) triggerGameOver();
+                return 0;
+            }
+            
+            playSound('hit');
+            
+            let bullseyeRatio = totalScore >= 200 ? 0.022 : 0.04;
+            let outerBullRatio = totalScore >= 200 ? 0.055 : 0.09;
+
+            if (distance <= boardRadius * bullseyeRatio) {
+                let lifeBonusText = "";
+                if (playerLives < 3) {
+                    playerLives++;
+                    updateLivesUI();
+                    lifeBonusText = "<br><span style='font-size:20px; color:#00ff55;'>+1 CAN KAZANDIN!</span>";
+                }
+                showCombo(`BULLSEYE!<br><span style='font-size:24px; color:#ffcc00;'>50 PUAN!</span>${lifeBonusText}`, "#ff0055");
+                speakScore(50); // Spiker anonsu
+                return 50; 
+            }
+            if (distance <= boardRadius * outerBullRatio) {
+                showCombo("OUTER BULL<br><span style='font-size:24px; color:#ffcc00;'>25 PUAN!</span>", "#00ffcc");
+                speakScore(25); // Spiker anonsu
+                return 25; 
+            }
+            
+            let angle = Math.atan2(dy, dx) * (180 / Math.PI) - 90;
+            if (angle < 0) angle += 360;
+            
+            let sectorIndex = Math.floor((angle + 9) / 18) % 20;
+            let baseScore = dartSectors[sectorIndex];
+            let calculatedPoints = baseScore;
+
+            if (distance >= boardRadius * 0.55 && distance <= boardRadius * 0.61) {
+                calculatedPoints = baseScore * 3;
+                showCombo(`TRIPLE ${baseScore}<br><span style='font-size:22px; color:#ffcc00;'>${calculatedPoints} PUAN!</span>`, "#ffcc00");
+            }
+            else if (distance >= boardRadius * 0.93 && distance <= boardRadius) {
+                calculatedPoints = baseScore * 2;
+                showCombo(`DOUBLE ${baseScore}<br><span style='font-size:22px; color:#00ff55;'>${calculatedPoints} PUAN!</span>`, "#00ff55");
+            }
+            else {
+                showCombo(`SINGLE ${baseScore}<br><span style='font-size:22px; color:#ffffff;'>${baseScore} PUAN!</span>`, "#ffffff");
+            }
+            
+            speakScore(calculatedPoints); // Spiker o anki tam skoru şevkle okur
+            return calculatedPoints;
+        }
+
+        function drawDartboard() {
+            ctx.save();
+            ctx.shadowBlur = 35;
+            ctx.shadowColor = "rgba(0,0,0,0.9)";
+            ctx.beginPath();
+            ctx.arc(boardCenter.x, boardCenter.y, boardRadius * 1.25, 0, Math.PI * 2);
+            ctx.fillStyle = "#16171c"; 
+            ctx.fill();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "#333";
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.beginPath();
+            ctx.arc(boardCenter.x, boardCenter.y, boardRadius, 0, Math.PI * 2);
+            ctx.fillStyle = "#0c0d12";
+            ctx.fill();
+
+            for (let i = 0; i < 20; i++) {
+                let startAngle = (i * 18 - 9) * (Math.PI / 180) - Math.PI / 2;
+                let endAngle = ((i + 1) * 18 - 9) * (Math.PI / 180) - Math.PI / 2;
+                
+                ctx.beginPath();
+                ctx.moveTo(boardCenter.x, boardCenter.y);
+                ctx.arc(boardCenter.x, boardCenter.y, boardRadius, startAngle, endAngle);
+                ctx.closePath();
+                
+                ctx.fillStyle = (i % 2 === 0) ? "#1a1c24" : "#ebdcb9";
+                ctx.fill();
+
+                drawArcSegment(boardRadius * 0.93, boardRadius, startAngle, endAngle, (i % 2 === 0) ? "#e74c3c" : "#27ae60");
+                drawArcSegment(boardRadius * 0.54, boardRadius * 0.60, startAngle, endAngle, (i % 2 === 0) ? "#e74c3c" : "#27ae60");
+            }
+
+            let bullCenterR = totalScore >= 200 ? 0.045 : 0.08;
+            let bullInnerR = totalScore >= 200 ? 0.022 : 0.035;
+
+            ctx.beginPath();
+            ctx.arc(boardCenter.x, boardCenter.y, boardRadius * bullCenterR, 0, Math.PI * 2);
+            ctx.fillStyle = "#27ae60";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(boardCenter.x, boardCenter.y, boardRadius * bullInnerR, 0, Math.PI * 2);
+            ctx.fillStyle = "#e74c3c";
+            ctx.fill();
+
+            ctx.save();
+            ctx.font = "bold " + (boardRadius * 0.11) + "px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            for (let i = 0; i < 20; i++) {
+                let angle = (i * 18) * (Math.PI / 180) - Math.PI / 2;
+                let textX = boardCenter.x + Math.cos(angle) * (boardRadius * 1.12);
+                let textY = boardCenter.y + Math.sin(angle) * (boardRadius * 1.12);
+                
+                ctx.fillStyle = "#000000";
+                ctx.fillText(dartSectors[i], textX + 1, textY + 1);
+                ctx.fillStyle = "#ffffff"; 
+                ctx.fillText(dartSectors[i], textX, textY);
+            }
+            ctx.restore();
+        }
+
+        function drawArcSegment(innerR, outerR, startA, endA, color) {
+            ctx.beginPath();
+            ctx.arc(boardCenter.x, boardCenter.y, outerR, startA, endA);
+            ctx.arc(boardCenter.x, boardCenter.y, innerR, endA, startA, true);
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+
+        function drawDart() {
+            if (isGameOver) return;
+            ctx.save();
+            ctx.translate(dart.x, dart.y);
+            ctx.scale(dart.scale, dart.scale);
+
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = "rgba(0,0,0,0.6)";
+
+            if (totalScore >= 100) {
+                ctx.fillStyle = "#ffcc00"; 
+                ctx.beginPath();
+                ctx.moveTo(-10, 22);
+                ctx.lineTo(10, 22);
+                ctx.lineTo(0, -8);
+                ctx.fill();
+
+                ctx.fillStyle = "#ffd700"; 
+                ctx.fillRect(-2.5, -25, 5, 17);
+                
+                ctx.fillStyle = "#ffaa00"; 
+                ctx.fillRect(-3.5, -14, 7, 4);
+            } else {
+                ctx.fillStyle = "#e74c3c";
+                ctx.beginPath();
+                ctx.moveTo(-8, 20);
+                ctx.lineTo(8, 20);
+                ctx.lineTo(0, -5);
+                ctx.fill();
+
+                ctx.fillStyle = "#95a5a6";
+                ctx.fillRect(-2, -22, 4, 17);
+                
+                ctx.fillStyle = "#f39c12";
+                ctx.fillRect(-2.5, -12, 5, 3);
+            }
+
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(0, -22);
+            ctx.lineTo(0, -40);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function update() {
+            if (!isGameOver) {
+                let targetReduction = totalScore * 0.0022; 
+                if (targetReduction > 0.58) targetReduction = 0.58; 
+                
+                boardRadius = baseBoardRadius * (1 - targetReduction);
+
+                if (totalScore >= 200) {
+                    if (!gameContainer.classList.contains('chaos-mode')) {
+                        gameContainer.classList.add('chaos-mode');
+                        document.querySelectorAll('.ui-box').forEach(el => el.classList.add('chaos-ui'));
+                    }
+                }
+
+                if (totalScore >= 60) {
+                    boardCenter.x += boardSpeedX * boardDirectionX;
+                    
+                    if (totalScore >= 200) {
+                        boardCenter.y += (boardSpeedY * 1.5) * boardDirectionY;
+                        if (boardCenter.y > baseBoardCenterY + 45 || boardCenter.y < baseBoardCenterY - 50) {
+                            boardDirectionY *= -1;
+                        }
+                    } else if (totalScore >= 140) {
+                        boardCenter.y += boardSpeedY * boardDirectionY;
+                        if (boardCenter.y > baseBoardCenterY + 25 || boardCenter.y < baseBoardCenterY - 35) {
+                            boardDirectionY *= -1;
+                        }
+                    }
+
+                    if (boardCenter.x + boardRadius * 1.15 > canvas.width || boardCenter.x - boardRadius * 1.15 < 0) {
+                        boardDirectionX *= -1;
+                    }
+                } else {
+                    boardCenter.x = canvas.width / 2;
+                    boardCenter.y = baseBoardCenterY;
+                }
+            }
+
+            if (dart.isPinned && !isGameOver) {
+                dart.x = boardCenter.x + dart.offsetX;
+                dart.y = boardCenter.y + dart.offsetY;
+            }
+
+            drawBrickWall();
+            drawDartboard();
+            
+            if (dart.isFlying && !isGameOver) {
+                if (totalScore >= 200 && Math.random() < 0.04) {
+                    currentWind += (Math.random() * 2.0 - 1.0);
+                    if(currentWind > 7.0) currentWind = 7.0;
+                    if(currentWind < -7.0) currentWind = -7.0;
+                    updateWindUI();
+                }
+
+                dart.vx += currentWind * 0.12; 
+                dart.vx *= 0.985;
+                
+                dart.x += dart.vx;
+                dart.y += dart.vy;
+                
+                let currentBoardRatio = boardRadius / baseBoardRadius;
+                let finalScaleLimit = 0.42 * currentBoardRatio; 
+
+                dart.scale -= 0.026; 
+                
+                if (dart.scale <= finalScaleLimit || dart.y <= boardCenter.y + boardRadius * 0.2) {
+                    let points = calculateScore(dart.x, dart.y);
+                    totalScore += points;
+                    scoreDisplay.innerText = totalScore;
+                    
+                    dart.isFlying = false;
+
+                    if (points > 0) {
+                        dart.isPinned = true;
+                        dart.offsetX = dart.x - boardCenter.x; 
+                        dart.offsetY = dart.y - boardCenter.y;
+                    }
+                    
+                    generateNewWind();
+                    
+                    if (playerLives > 0) {
+                        let reloadTime = totalScore >= 200 ? 800 : 1000;
+                        setTimeout(resetDartPosition, reloadTime); 
+                    }
+                }
+            }
+            
+            drawDart();
+            requestAnimationFrame(update);
+        }
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            if(!dart.isFlying && !dart.isPinned) resetDartPosition();
+        });
+    </script>
+</body>
+</html>
